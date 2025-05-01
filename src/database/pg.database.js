@@ -3,31 +3,36 @@ require("dotenv").config();
 const { Pool } = require("pg");
 
 const pool = new Pool({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_DATABASE,
-    password: process.env.DB_PASSWORD,
-    port: process.env.DB_PORT,
-    ssl: true
+    connectionString: process.env.PG_CONNECTION_STRING,
+    ssl: {
+        rejectUnauthorized: false
+    },
+    max: 5, 
+    idleTimeoutMillis: 30000, 
+    connectionTimeoutMillis: 5000 
 });
 
-const connect = async () => {
-    try {
-        await pool.connect();
-        console.log("Database connected!");
-    } catch (error) {
-        console.error("Database connection error", error);
-    }
-}
-
-connect();
-
 const query = async (text, params) => {
+    let client;
     try {
-        const result = await pool.query(text, params);
+        client = await pool.connect();
+        const result = await client.query(text, params);
         return result;
     } catch (error) {
-        console.error("Database query error", error);
+        console.error('Database error:', error);
+        throw error; 
+    } finally {
+        if (client) client.release(); 
     }
-}
-module.exports = { query };
+};
+
+const checkConnection = async () => {
+    try {
+        await pool.query('SELECT 1');
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+module.exports = { query, checkConnection };
